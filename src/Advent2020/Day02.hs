@@ -8,7 +8,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Advent2020.Day02 (day02_01) where
+module Advent2020.Day02 (day02_01, day02_02) where
 
 import Advent2020.Input qualified
 import Data.Char qualified as Char

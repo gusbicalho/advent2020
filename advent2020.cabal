@@ -54,6 +54,8 @@ library
   exposed-modules:     Advent2020
                      , Advent2020.BoundedSet
                      , Advent2020.Day01
+                     , Advent2020.Day02
+                     , Advent2020.Day03
 
 test-suite advent2020-test
   import:              common-options
