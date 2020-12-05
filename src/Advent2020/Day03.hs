@@ -1,51 +1,56 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Advent2020.Day03 (day03_01, day03_02) where
 
 import Advent2020.Input qualified
 import Control.Exception (throwIO)
-import Control.Monad.Trans.State.Strict qualified as StateT
 import Data.Function ((&))
+import Data.Functor ((<&>))
 import Data.Maybe (fromJust)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Numeric.Natural (Natural)
-import Data.Foldable (Foldable(foldl'))
-import Data.Functor ((<&>))
 
 day03_01 :: IO Natural
-day03_01 = loadGame <&> solve01 (Step 3 1)
+day03_01 = loadGame <&> solve01 slope01
 
--- >>> solve01 (Step 3 1) example
+slope01 :: Slope
+slope01 = Slope 3 1
+
+-- >>> solve01 (Slope 3 1) example
 -- 7
 
 -- >>> day03_01
 -- 232
 
-solve01 :: Step -> GameState -> Natural
-solve01 step gameState = StateT.execState (go gameState) 0
+solve01 :: Slope -> GameState -> Natural
+solve01 slope = go 0
  where
-  go gameState = case move step gameState of
-    Nothing -> return ()
-    Just gameState -> do
-      case currentSlot gameState of
-        Tree -> StateT.modify' (1 +)
-        _ -> return ()
-      go gameState
+  go !n (move slope -> Nothing) = n
+  go !n (move slope -> Just gameState) =
+    go
+      (if currentSlot gameState == Tree then n + 1 else n)
+      gameState
 
 day03_02 :: IO Natural
-day03_02 = loadGame <&> solve02 [Step 1 1, Step 3 1, Step 5 1, Step 7 1, Step 1 2]
+day03_02 = loadGame <&> solve02 slopes02
 
--- >>> solve02 [Step 1 1, Step 3 1, Step 5 1, Step 7 1, Step 1 2] example
+slopes02 :: [Slope]
+slopes02 = [Slope 1 1, Slope 3 1, Slope 5 1, Slope 7 1, Slope 1 2]
+
+-- >>> solve02 slopes02 example
 -- 336
 
 -- >>> day03_02
 -- 3952291680
 
-solve02 :: [Step] -> GameState -> Natural
-solve02 steps gameState = foldl' (*) 1 $ solve01 <$> steps <*> [gameState]
+solve02 :: [Slope] -> GameState -> Natural
+solve02 steps gameState = product $ solve01 <$> steps <*> pure gameState
 
-data Slot = Open | Tree
+data Slot = Open | Tree deriving stock (Eq, Show)
 newtype Row = Row {unRow :: Seq Slot}
 data GameMap = GameMap
   { gmXSize :: Natural
@@ -53,7 +58,7 @@ data GameMap = GameMap
   , gmRows :: Seq Row
   }
 data Position = Position Natural Natural
-data Step = Step Natural Natural
+data Slope = Slope Natural Natural
 data GameState = GameState GameMap Position
 
 initialPosition :: Position
@@ -65,9 +70,9 @@ currentSlot (GameState (GameMap _ _ rows) (Position x y)) =
     & unRow
     & (`Seq.index` fromIntegral x)
 
-move :: Step -> GameState -> Maybe GameState
+move :: Slope -> GameState -> Maybe GameState
 move
-  (Step deltaX deltaY)
+  (Slope deltaX deltaY)
   ( GameState
       gameMap@(GameMap xSize ySize _)
       (Position currentX currentY)
