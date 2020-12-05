@@ -16,7 +16,7 @@ category:            Utility
 build-type:          Simple
 extra-doc-files:     README.md
                      CHANGELOG.md
-tested-with:         GHC == 8.10.1
+tested-with:         GHC == 8.10.2
 
 source-repository head
   type:                git
@@ -24,6 +24,9 @@ source-repository head
 
 common common-options
   build-depends:       base ^>= 4.14.0.0
+                     , transformers
+                     , containers
+                     , vector
 
   ghc-options:         -Wall
                        -Wcompat
@@ -49,6 +52,7 @@ library
   import:              common-options
   hs-source-dirs:      src
   exposed-modules:     Advent2020
+                       Advent2020.Day01
 
 test-suite advent2020-test
   import:              common-options

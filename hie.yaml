@@ -1,0 +1,4 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:advent2020"

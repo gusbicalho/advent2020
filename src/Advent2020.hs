@@ -7,9 +7,7 @@ Advent of Code 2020 exercises in Haskell
 -}
 
 module Advent2020
-    ( projectName
+    ( module Advent2020.Day01
     ) where
 
-
-projectName :: String
-projectName = "advent2020"
+import Advent2020.Day01
