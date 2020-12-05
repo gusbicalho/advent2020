@@ -11,28 +11,27 @@
 module Advent2020.Day01 (day01_01, day01_02) where
 
 import Advent2020.BoundedSet qualified as BoundedSet
-import Control.Exception ( catch, throwIO, IOException )
-import Control.Monad (forever)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Maybe qualified as MaybeT
+import Advent2020.Input qualified
 import Control.Monad.Trans.State.Strict qualified as StateT
-import Control.Monad.Trans.Writer.CPS qualified as WriterT
 import Data.Functor.Identity qualified as Identity
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import System.IO qualified as IO
-import System.IO.Error qualified as IO.Error
 import Text.Read (readMaybe)
 
-inputFile :: FilePath
-inputFile = "resources/day01/input"
+example :: Seq Integer
+example = Seq.fromList [1721, 979, 366, 299, 675, 1456]
+
+loadInput :: IO (Seq Integer)
+loadInput =
+  Advent2020.Input.loadInput
+    (readMaybe @Integer)
+    "resources/day01/input"
 
 newtype Response = Response {unResponse :: Maybe Integer}
   deriving stock (Eq, Show)
 
 day01_01 :: IO Response
-day01_01 = solve01 <$> getInput
+day01_01 = solve01 <$> loadInput
 
 -- >>> day01_01
 -- Response {unResponse = Just 1016964}
@@ -55,9 +54,9 @@ solve01 =
       LT -> DropFirst
 
 day01_02 :: IO Response
-day01_02 = solve02 <$> getInput
+day01_02 = solve02 <$> loadInput
 
--- >>> solve02 <$> getInput
+-- >>> solve02 <$> loadInput
 -- Response {unResponse = Just 182588480}
 
 -- >>> solve02 example
@@ -107,28 +106,3 @@ closingIn
       DropLast -> closingIn f front
       DropFirst -> closingIn f $ middle Seq.|> lastElement
 closingIn _ _ = pure Nothing
-
-example :: Seq Integer
-example = Seq.fromList [1721, 979, 366, 299, 675, 1456]
-
-getInput :: IO (Seq Integer)
-getInput = IO.withFile inputFile IO.ReadMode $ \inputHandle ->
-  WriterT.execWriterT . MaybeT.runMaybeT . forever $ do
-    line <-
-      stopOnNothing . liftIO $
-        (Just <$> IO.hGetLine inputHandle)
-          `catch` \(ex :: IOException) ->
-            if IO.Error.isEOFError ex
-              then pure Nothing
-              else throwIO ex
-    num <- readMaybeT @Integer line
-    lift . WriterT.tell $ Seq.singleton num
- where
-  stopOnNothing a =
-    a >>= \case
-      Nothing -> stop
-      Just v -> pure v
-  stop :: forall a m. Applicative m => MaybeT.MaybeT m a
-  stop = MaybeT.MaybeT $ pure Nothing
-  readMaybeT :: forall a m. (Applicative m, Read a) => String -> MaybeT.MaybeT m a
-  readMaybeT = MaybeT.MaybeT . pure . readMaybe
