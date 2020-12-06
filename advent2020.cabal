@@ -28,6 +28,7 @@ common common-options
                      , containers
                      , vector
                      , generic-data
+                     , array
 
   ghc-options:         -Wall
                        -Wcompat
@@ -58,6 +59,7 @@ library
                      , Advent2020.Day02
                      , Advent2020.Day03
                      , Advent2020.Day04
+                     , Advent2020.Day05
                      , Advent2020.Input
 
 test-suite advent2020-test
