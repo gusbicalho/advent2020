@@ -29,3 +29,6 @@ loadInput parseLine inputFile = IO.withFile inputFile IO.ReadMode $ \inputHandle
             then pure Nothing
             else throwIO ex
   stop = MaybeT.MaybeT $ pure Nothing
+
+inputLines :: FilePath -> IO (Seq String)
+inputLines = loadInput Just
