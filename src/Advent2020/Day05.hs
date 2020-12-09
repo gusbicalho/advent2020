@@ -23,7 +23,7 @@ day05_01 :: IO Word16
 day05_01 = solve01 <$> inputWords
 
 solve01 :: Seq Word16 -> Word16
-solve01 = getMax . foldMap Max
+solve01 = maximum
 
 -- >>> day05_01
 -- 850
