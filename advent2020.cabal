@@ -29,6 +29,7 @@ common common-options
                      , vector
                      , generic-data
                      , array
+                     , megaparsec
 
   ghc-options:         -Wall
                        -Wcompat
@@ -61,6 +62,7 @@ library
                      , Advent2020.Day04
                      , Advent2020.Day05
                      , Advent2020.Day06
+                     , Advent2020.Day07
                      , Advent2020.Input
 
 test-suite advent2020-test
