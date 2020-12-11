@@ -145,7 +145,7 @@ ruleParser =
 
 example :: Seq Rule
 example =
-  Seq.fromList . Maybe.fromJust . traverse (Parsec.parseMaybe ruleParser) $
+  Seq.fromList . Maybe.mapMaybe (Parsec.parseMaybe ruleParser) $
     [ "light red bags contain 1 bright white bag, 2 muted yellow bags."
     , "dark orange bags contain 3 bright white bags, 4 muted yellow bags."
     , "bright white bags contain 1 shiny gold bag."
@@ -159,7 +159,7 @@ example =
 
 example2 :: Seq Rule
 example2 =
-  Seq.fromList . Maybe.fromJust . traverse (Parsec.parseMaybe ruleParser) $
+  Seq.fromList . Maybe.mapMaybe (Parsec.parseMaybe ruleParser) $
     [ "shiny gold bags contain 2 dark red bags."
     , "dark red bags contain 2 dark orange bags."
     , "dark orange bags contain 2 dark yellow bags."
