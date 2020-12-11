@@ -1,4 +1,5 @@
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
@@ -9,6 +10,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Advent2020.Day07 (day07_01, day07_02) where
@@ -31,47 +33,64 @@ import Text.Megaparsec.Char qualified as Parsec.Char
 import Text.Megaparsec.Char.Lexer qualified as Parsec.Char.Lexer
 
 day07_01 :: IO Int
-day07_01 = solve01 <$> input
+day07_01 = solve01 . ruleIndex <$> input
 
-solve01 :: Seq Rule -> Int
-solve01 rules = Set.size $ closeTransitively allowedByRules (Set.singleton $ BagType "shiny gold")
+solve01 :: RuleIndex -> Int
+solve01 index =
+  Set.size
+    . Foldable.fold
+    . drop 1 -- this will always be the initial set, the shiny gold bag
+    . transitively allowedByRules
+    $ Set.singleton initialBag
  where
+  initialBag = BagType "shiny gold"
   allowedByRules :: BagType -> Set BagType
-  allowedByRules bt = Set.fromList . fmap bagType . filter (allows 1 bt) . Foldable.toList $ rules
+  allowedByRules bt = Map.keysSet . Map.filter (allows 1 bt) $ index
+  allows :: Natural -> BagType -> Map BagType Natural -> Bool
+  allows n bt contents = case Map.lookup bt contents of
+    Nothing -> False
+    Just maxBags -> n <= maxBags
 
-allows :: Natural -> BagType -> Rule -> Bool
-allows n bt (Rule _ contents) = case Map.lookup bt contents of
-  Nothing -> False
-  Just maxBags -> n <= maxBags
-
--- >>> solve01 example
+-- >>> solve01 . ruleIndex $ example
 -- 4
 
 -- >>> day07_01
 -- 185
 
-day07_02 :: IO Int
-day07_02 = solve02 <$> input
+day07_02 :: IO Natural
+day07_02 = solve02 . ruleIndex <$> input
 
-solve02 :: Seq Rule -> Int
-solve02 _ = 1
+solve02 :: RuleIndex -> Natural
+solve02 index = collect (BagType "shiny gold")
+ where
+  collect :: BagType -> Natural
+  collect key = case Map.lookup key index of
+    Nothing -> 0
+    Just contents ->
+      sum
+        . fmap (\(k, n) -> let !subtotal = collect k in n + n * subtotal)
+        . Map.toList
+        $ contents
+
+-- >>> solve02 . ruleIndex $ example
+-- 32
+
+-- >>> solve02 . ruleIndex $ example2
+-- 126
 
 -- >>> day07_02
--- 3288
+-- 89084
 
 newtype BagType = BagType String
   deriving stock (Eq, Show, Ord)
 
-newtype MustContainRelations = MustContainRelations {unMustContainIndex :: Map BagType (Map BagType Natural)}
+type RuleIndex = Map BagType (Map BagType Natural)
 
 data Rule = Rule
   { bagType :: BagType
   , contents :: Map BagType Natural
   }
   deriving stock (Eq, Show)
-
-closeTransitively :: Ord a => (a -> Set a) -> Set a -> Set a
-closeTransitively prop = Foldable.fold . drop 1 . transitively prop
 
 transitively :: Ord a => (a -> Set a) -> Set a -> [Set a]
 transitively prop = go Set.empty
@@ -86,41 +105,43 @@ transitively prop = go Set.empty
               (Set.union previouslyKnown diff)
               (Foldable.foldMap prop diff)
 
-mustContainRelations :: Seq Rule -> MustContainRelations
-mustContainRelations = MustContainRelations . Foldable.foldl' addRule Map.empty
+ruleIndex :: Seq Rule -> RuleIndex
+ruleIndex = Foldable.foldl' addRule Map.empty
  where
-  addRule :: Map BagType (Map BagType Natural) -> Rule -> Map BagType (Map BagType Natural)
-  addRule ruleMap (Rule bt contents) = Map.insertWith mergeRule bt contents ruleMap
-  mergeRule :: Map BagType Natural -> Map BagType Natural -> Map BagType Natural
-  mergeRule =
-    Map.Merge.merge
-      Map.Merge.preserveMissing'
-      Map.Merge.preserveMissing'
-      (Map.Merge.zipWithMaybeMatched (\_ n1 n2 -> Just (n1 + n2)))
+  addRule ruleMap (Rule bt contents) =
+    Map.insertWith (mergeMapsWith (+)) bt contents ruleMap
+
+mergeMapsWith :: Ord k => (a -> a -> a) -> Map k a -> Map k a -> Map k a
+mergeMapsWith mergeVals =
+  Map.Merge.merge
+    Map.Merge.preserveMissing'
+    Map.Merge.preserveMissing'
+    (Map.Merge.zipWithMaybeMatched (\_ n1 n2 -> Just (mergeVals n1 n2)))
 
 ruleParser :: Parsec.Parsec Void String Rule
-ruleParser = Rule <$> bagType <*> contents
+ruleParser =
+  Rule <$> bagTypeEndingWith (Parsec.Char.string " bags contain") <*> contents
  where
-  bagType :: Parsec.Parsec Void String BagType
-  bagType = BagType <$> Parsec.manyTill Parsec.anySingle (Parsec.Char.string " bags contain")
+  bagTypeEndingWith :: Parsec.Parsec Void String a -> Parsec.Parsec Void String BagType
+  bagTypeEndingWith suffix = BagType <$> Parsec.manyTill Parsec.anySingle suffix
   contents :: Parsec.Parsec Void String (Map BagType Natural)
   contents =
     Foldable.asum
       [ Parsec.Char.string " no other bags." $> Map.empty
-      , fmap Foldable.fold . Parsec.many $ do
+      , foldMany $ do
           Parsec.Char.space1
           count :: Natural <- Parsec.Char.Lexer.decimal
           Parsec.Char.space1
           innerBagType <-
-            BagType
-              <$> Parsec.manyTill
-                Parsec.anySingle
-                ( Parsec.Char.string " bag"
-                    *> Parsec.optional (Parsec.Char.char 's')
-                    *> Parsec.oneOf ",."
-                )
+            bagTypeEndingWith
+              ( Parsec.Char.string " bag"
+                  *> Parsec.optional (Parsec.Char.char 's')
+                  *> Parsec.oneOf ",."
+              )
           pure $ Map.singleton innerBagType count
       ]
+  foldMany :: Monoid m => Parsec.ParsecT Void String a m -> Parsec.ParsecT Void String a m
+  foldMany = fmap Foldable.fold . Parsec.many
 
 example :: Seq Rule
 example =
@@ -136,7 +157,17 @@ example =
     , "dotted black bags contain no other bags."
     ]
 
--- >>> example
+example2 :: Seq Rule
+example2 =
+  Seq.fromList . Maybe.fromJust . traverse (Parsec.parseMaybe ruleParser) $
+    [ "shiny gold bags contain 2 dark red bags."
+    , "dark red bags contain 2 dark orange bags."
+    , "dark orange bags contain 2 dark yellow bags."
+    , "dark yellow bags contain 2 dark green bags."
+    , "dark green bags contain 2 dark blue bags."
+    , "dark blue bags contain 2 dark violet bags."
+    , "dark violet bags contain no other bags."
+    ]
 
 input :: IO (Seq Rule)
 input = Advent2020.Input.loadInput (Parsec.parseMaybe ruleParser) "resources/day07/input"
