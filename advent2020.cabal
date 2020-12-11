@@ -62,6 +62,7 @@ library
                      , Advent2020.Day05
                      , Advent2020.Day06
                      , Advent2020.Day07
+                     , Advent2020.Day08
                      , Advent2020.Input
   other-modules:       Advent2020.DayExample
 
