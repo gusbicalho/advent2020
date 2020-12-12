@@ -9,12 +9,13 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Text.Read qualified as Read
+import Data.Set (Set)
 
 day08_01 :: IO Int
 day08_01 = solve01 <$> input
 
 solve01 :: Seq Op -> Int
-solve01 = unAccumulator . fst . runOps
+solve01 = unAccumulator . fst . fst . runOps
 
 -- >>> solve01 $ example
 -- 5
@@ -27,18 +28,20 @@ day08_02 = solve02 <$> input
 
 solve02 :: Seq Op -> Maybe Int
 solve02 =
-  fmap (unAccumulator . fst)
+  fmap (unAccumulator . fst . fst)
     . Foldable.find halted
     . fmap runOps
     . possibleSwaps swapJmpAndNop
  where
+  visitedOpsInFirstRun = snd . fst . runOps
+  possibleSwaps swap ops =
+    flip Maybe.mapMaybe (Foldable.toList $ visitedOpsInFirstRun ops) $ \(OpPtr ix) -> do
+      op <- ops Seq.!? ix
+      swapped <- swap op
+      pure $ Seq.update ix swapped ops
   swapJmpAndNop (Jmp n) = Just $ Nop n
   swapJmpAndNop (Nop n) = Just $ Jmp n
   swapJmpAndNop _ = Nothing
-  possibleSwaps swap ops = flip Maybe.mapMaybe [0 .. Seq.length ops] $ \ix -> do
-    op <- ops Seq.!? ix
-    swapped <- swap op
-    pure $ Seq.update ix swapped ops
   halted (_, Halt) = True
   halted _ = False
 
@@ -48,27 +51,27 @@ solve02 =
 -- >>> day08_02
 -- Just 758
 
-runOps :: Seq Op -> (Accumulator, Exit)
-runOps ops = go Set.empty (Instruction 0) (Accumulator 0)
+runOps :: Seq Op -> ((Accumulator, Set OpPtr), Exit)
+runOps ops = go Set.empty (OpPtr 0) (Accumulator 0)
  where
-  go visited current@(Instruction currentIx) acc
-    | current `Set.member` visited = (acc, Loop)
+  go visited current@(OpPtr currentIx) acc
+    | current `Set.member` visited = ((acc, visited), Loop)
     | Just op <- ops Seq.!? currentIx = runOp op current acc (go (Set.insert current visited))
-    | currentIx == Seq.length ops = (acc, Halt)
-    | otherwise = (acc, BadJump)
+    | currentIx == Seq.length ops = ((acc, visited), Halt)
+    | otherwise = ((acc, visited), BadJump)
 
-runOp :: Op -> Instruction -> Accumulator -> (Instruction -> Accumulator -> k) -> k
+runOp :: Op -> OpPtr -> Accumulator -> (OpPtr -> Accumulator -> k) -> k
 runOp op current acc k = case op of
   Jmp n -> k (jmp n current) acc
   Acc n -> k (next current) (add n acc)
   Nop _ -> k (next current) acc
  where
   next = jmp 1
-  jmp n (Instruction i) = Instruction (i + n)
+  jmp n (OpPtr i) = OpPtr (i + n)
   add n (Accumulator a) = Accumulator (a + n)
 
 newtype Accumulator = Accumulator {unAccumulator :: Int}
-newtype Instruction = Instruction Int
+newtype OpPtr = OpPtr Int
   deriving stock (Eq, Ord)
 data Exit = Loop | BadJump | Halt
 
