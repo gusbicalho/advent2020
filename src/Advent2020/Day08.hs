@@ -16,80 +16,21 @@
 module Advent2020.Day08 (day08_01, day08_02) where
 
 import Advent2020.Input qualified
-import Control.Monad.Trans.Class (MonadTrans (lift))
-import Control.Monad.Trans.Maybe qualified as MaybeT
-import Control.Monad.Trans.State.Strict qualified as StateT
-import Data.Functor.Identity qualified as Identity
+import Data.Foldable qualified as Foldable
 import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
+import Data.Set qualified as Set
+import Data.Traversable (for)
 import Numeric.Natural (Natural)
 import Text.Read qualified as Read
-import qualified Data.Set as Set
-import Control.Monad (forever)
 
 day08_01 :: IO Int
 day08_01 = solve01 <$> input
 
 solve01 :: Seq Op -> Int
-solve01 ops =
-  unAccumulator . evalStack . forever $ do
-    whenM hasVisitedCurrentBefore $
-      halt
-    recordVisitedCurrent
-    (Instruction instruction) <- currentInstruction
-    case ops Seq.!? instruction of
-      Nothing -> halt
-      Just (Jmp n) -> jmp n
-      Just (Acc n) -> acc n *> next
-      Just Nop -> next
-    pure ()
- where
-  hasVisitedCurrentBefore :: Solve01M Bool
-  hasVisitedCurrentBefore = do
-    current <- currentInstruction
-    visited <- lift StateT.get
-    pure $ current `Set.member` visited
-  recordVisitedCurrent :: Solve01M ()
-  recordVisitedCurrent = do
-    current <- currentInstruction
-    lift . StateT.modify' $ Set.insert current
-  currentInstruction :: Solve01M Instruction
-  currentInstruction = lift . lift $ StateT.get
-  next :: Solve01M ()
-  next = jmp 1
-  halt :: Solve01M ()
-  halt = MaybeT.MaybeT $ pure Nothing
-  jmp :: Int -> Solve01M ()
-  jmp n = lift . lift . StateT.modify' $ \(Instruction i) -> Instruction (i + n)
-  acc :: Int -> Solve01M ()
-  acc n = lift . lift . lift . StateT.modify' $ \(Accumulator i) -> Accumulator (i + n)
-  evalStack :: Solve01M () -> Accumulator
-  evalStack =
-    flip StateT.execState (Accumulator 0)
-      . flip StateT.execStateT (Instruction 0)
-      . flip StateT.execStateT Set.empty
-      . MaybeT.runMaybeT
-
-whenM :: Monad m => m Bool -> m () -> m ()
-whenM condM action = condM >>= \case
-  True -> action
-  False -> pure ()
-
-type Solve01M a =
-  MaybeT.MaybeT
-    ( StateT.StateT
-        (Set Instruction)
-        ( StateT.StateT
-            Instruction
-            (StateT.State Accumulator)
-        )
-    )
-    a
-newtype Accumulator = Accumulator {unAccumulator :: Int}
-newtype Instruction = Instruction Int
-  deriving newtype (Eq, Ord)
+solve01 = unAccumulator . fst . runOps
 
 -- >>> solve01 $ example
 -- 5
@@ -97,21 +38,61 @@ newtype Instruction = Instruction Int
 -- >>> day08_01
 -- 1594
 
-day08_02 :: IO Natural
+day08_02 :: IO (Maybe Int)
 day08_02 = solve02 <$> input
 
-solve02 :: Seq Op -> Natural
-solve02 _input = 0
+solve02 :: Seq Op -> Maybe Int
+solve02 =
+  fmap (unAccumulator . fst)
+    . Foldable.find halted
+    . fmap runOps
+    . possibleSwaps swapJmpAndNop
+ where
+  swapJmpAndNop (Jmp n) = Just $ Nop n
+  swapJmpAndNop (Nop n) = Just $ Jmp n
+  swapJmpAndNop _ = Nothing
+  possibleSwaps swap ops = flip Maybe.mapMaybe [0 .. Seq.length ops] $ \ix -> do
+    op <- ops Seq.!? ix
+    swapped <- swap op
+    pure $ Seq.update ix swapped ops
+  halted (_, Halt) = True
+  halted _ = False
 
 -- >>> solve02 $ example
+-- Just 8
 
 -- >>> day08_02
+-- Just 758
 
-data Op = Nop | Acc Int | Jmp Int
+runOps :: Seq Op -> (Accumulator, Exit)
+runOps ops = go Set.empty (Instruction 0) (Accumulator 0)
+ where
+  go visited current@(Instruction currentIx) acc
+    | current `Set.member` visited = (acc, Loop)
+    | Just op <- ops Seq.!? currentIx = runOp op current acc (go (Set.insert current visited))
+    | currentIx == Seq.length ops = (acc, Halt)
+    | otherwise = (acc, BadJump)
+
+runOp :: Op -> Instruction -> Accumulator -> (Instruction -> Accumulator -> k) -> k
+runOp op current acc k = case op of
+  Jmp n -> k (jmp n current) acc
+  Acc n -> k (next current) (add n acc)
+  Nop _ -> k (next current) acc
+ where
+  next = jmp 1
+  jmp n (Instruction i) = Instruction (i + n)
+  add n (Accumulator a) = Accumulator (a + n)
+
+newtype Accumulator = Accumulator {unAccumulator :: Int}
+newtype Instruction = Instruction Int
+  deriving newtype (Eq, Ord)
+data Exit = Loop | BadJump | Halt
+
+data Op = Nop Int | Acc Int | Jmp Int
   deriving stock (Eq, Show)
 
 parseOp :: String -> Maybe Op
-parseOp ('n' : 'o' : 'p' : ' ' : _) = Just Nop
+parseOp ('n' : 'o' : 'p' : ' ' : num) = Nop <$> readSignedInt num
 parseOp ('a' : 'c' : 'c' : ' ' : num) = Acc <$> readSignedInt num
 parseOp ('j' : 'm' : 'p' : ' ' : num) = Jmp <$> readSignedInt num
 parseOp _ = Nothing
