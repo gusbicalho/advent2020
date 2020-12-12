@@ -1,18 +1,5 @@
-{-# LANGUAGE ApplicativeDo #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-
 module Advent2020.Day08 (day08_01, day08_02) where
 
 import Advent2020.Input qualified
@@ -20,10 +7,7 @@ import Data.Foldable qualified as Foldable
 import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Data.Set (Set)
 import Data.Set qualified as Set
-import Data.Traversable (for)
-import Numeric.Natural (Natural)
 import Text.Read qualified as Read
 
 day08_01 :: IO Int
@@ -85,7 +69,7 @@ runOp op current acc k = case op of
 
 newtype Accumulator = Accumulator {unAccumulator :: Int}
 newtype Instruction = Instruction Int
-  deriving newtype (Eq, Ord)
+  deriving stock (Eq, Ord)
 data Exit = Loop | BadJump | Halt
 
 data Op = Nop Int | Acc Int | Jmp Int
