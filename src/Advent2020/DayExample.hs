@@ -23,7 +23,7 @@ import qualified Data.Sequence as Seq
 dayExample_01 :: IO Natural
 dayExample_01 = solve01 <$> input
 
-solve01 :: Seq String -> Natural
+solve01 :: Seq Input -> Natural
 solve01 _input = 0
 -- >>> solve01 $ example
 
@@ -32,7 +32,7 @@ solve01 _input = 0
 dayExample_02 :: IO Natural
 dayExample_02 = solve02 <$> input
 
-solve02 :: Seq String -> Natural
+solve02 :: Seq Input -> Natural
 solve02 _input = 0
 -- >>> solve02 $ example
 
