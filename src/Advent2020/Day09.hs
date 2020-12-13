@@ -1,27 +1,17 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ApplicativeDo #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Advent2020.Day09 (day09_01, day09_02) where
 
 import Advent2020.Input qualified
 import Data.Foldable qualified as Foldable
+import Data.Function ((&))
 import Data.Functor ((<&>))
-import Data.Kind (Type)
 import Data.List qualified as List
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NonEmpty
@@ -29,6 +19,8 @@ import Data.Maybe qualified as Maybe
 import Data.Proxy (Proxy (Proxy))
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Data.Set (Set)
+import Data.Set qualified as Set
 import GHC.TypeLits (KnownNat, Nat, natVal)
 import Text.Read qualified as Read
 
@@ -67,11 +59,7 @@ solve02 xs = do
 -- >>> day09_02
 -- Just 76096372
 
-type Preamble :: Nat -> Type
-newtype Preamble n = Preamble (Seq Word)
-
-type XmasFrame :: Nat -> Type
-data XmasFrame n = XmasFrame (Preamble n) [Word]
+data XmasFrame (n :: Nat) = XmasFrame (Preamble n) [Word]
 
 findInvalidItem :: forall (n :: Nat). KnownNat n => Seq Word -> Maybe Word
 findInvalidItem = Maybe.listToMaybe . Maybe.mapMaybe invalidNextItem . xmasFrames @n
@@ -84,10 +72,7 @@ findInvalidItem = Maybe.listToMaybe . Maybe.mapMaybe invalidNextItem . xmasFrame
       Just _ -> Nothing
 
 validate :: Word -> XmasFrame n -> Maybe (Word, Word)
-validate x (XmasFrame (Preamble ps) _) =
-  Foldable.find accepts ps <&> \y -> (y, x - y)
- where
-  accepts y = let d = x - y in d /= y && d `Foldable.elem` ps
+validate x (XmasFrame p _) = preambleMatches x p
 
 nextItem :: XmasFrame n -> Maybe Word
 nextItem (XmasFrame _ []) = Nothing
@@ -103,19 +88,27 @@ nextFrame :: XmasFrame n -> Maybe (XmasFrame n)
 nextFrame (XmasFrame _ []) = Nothing
 nextFrame (XmasFrame pre (x : xs)) = Just $ XmasFrame (addToPreamble x pre) xs
 
+data Preamble (n :: Nat) = Preamble (Seq Word) (Set Word)
+
 preamble :: forall (n :: Nat). KnownNat n => Seq Word -> Maybe (Preamble n, Seq Word)
 preamble xs = case Seq.splitAt preambleSize xs of
   (front, back)
     | length front < preambleSize -> Nothing
-    | otherwise -> Just (Preamble @n front, back)
+    | otherwise -> Just (Preamble @n front (Set.fromList . Foldable.toList $ front), back)
  where
   preambleSize :: Int
   preambleSize = fromIntegral $ natVal @n Proxy
 
 addToPreamble :: Word -> Preamble n -> Preamble n
-addToPreamble x p@(Preamble xs) = case xs of
+addToPreamble x p@(Preamble xSeq xSet) = case xSeq of
   Seq.Empty -> p -- 0-sized preamble
-  _ Seq.:<| xs' -> Preamble (xs' Seq.|> x)
+  droppedX Seq.:<| xs -> Preamble (xs Seq.|> x) (xSet & Set.delete droppedX & Set.insert x)
+
+preambleMatches :: Word -> Preamble n -> Maybe (Word, Word)
+preambleMatches x (Preamble xSeq xSet) =
+  Foldable.find accepts xSeq <&> \y -> (y, x - y)
+ where
+  accepts y = let d = x - y in d /= y && d `elem` xSet
 
 maybeLast :: [a] -> Maybe a
 maybeLast [] = Nothing
