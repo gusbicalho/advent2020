@@ -100,15 +100,24 @@ preamble xs = case Seq.splitAt preambleSize xs of
   preambleSize = fromIntegral $ natVal @n Proxy
 
 addToPreamble :: Word -> Preamble n -> Preamble n
-addToPreamble x p@(Preamble xSeq xSet) = case xSeq of
+addToPreamble x p@(Preamble queue xSet) = case queue of
   Seq.Empty -> p -- 0-sized preamble
-  droppedX Seq.:<| xs -> Preamble (xs Seq.|> x) (xSet & Set.delete droppedX & Set.insert x)
+  dropped Seq.:<| queue' -> Preamble (queue' Seq.|> x) (xSet & Set.delete dropped & Set.insert x)
 
 preambleMatches :: Word -> Preamble n -> Maybe (Word, Word)
-preambleMatches x (Preamble xSeq xSet) =
-  Foldable.find accepts xSeq <&> \y -> (y, x - y)
+preambleMatches item (Preamble _ xSet) =
+  Foldable.find accepts low <&> \y -> (y, item - y)
  where
-  accepts y = let d = x - y in d /= y && d `elem` xSet
+  half = item `div` 2
+  (low, high) = fullSplit half xSet
+  accepts y =
+    let d = item - y
+     in d /= y && (d `elem` high)
+
+fullSplit :: Ord a => a -> Set a -> (Set a, Set a)
+fullSplit i set = case Set.splitMember i set of
+  (low, False, high) -> (low, high)
+  (low, True, high) -> (Set.insert i low, high)
 
 maybeLast :: [a] -> Maybe a
 maybeLast [] = Nothing
