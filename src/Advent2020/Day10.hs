@@ -1,7 +1,6 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
@@ -28,10 +27,10 @@ import Data.Array.ST qualified as Array
 import Data.Foldable qualified as Foldable
 import Data.Function ((&))
 import Data.List qualified as List
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Maybe qualified as Maybe
-import Data.Sequence (Seq)
+import Data.Sequence (Seq ((:|>)), (|>))
 import Data.Sequence qualified as Seq
 import Data.Traversable (for)
 import Data.Word (Word64)
@@ -50,7 +49,7 @@ solve01 ratings = uncurry (*) ratingDiffs
       & Foldable.foldl' recordDiff (initialDiffs, 0)
       & fst
       & addDiff3
-  initialDiffs = (0,0)
+  initialDiffs = (0, 0)
   addDiff1 (diffs1, diffs3) = (succ diffs1, diffs3)
   addDiff3 (diffs1, diffs3) = (diffs1, succ diffs3)
   recordDiff (diffs, prevRating) rating =
@@ -75,12 +74,12 @@ solve02 ratings =
  where
   sortedRatings = ratings & Seq.sort & addBuiltIn
   addBuiltIn Seq.Empty = Seq.fromList [3]
-  addBuiltIn s@(_ Seq.:|> lastAdapter) = s Seq.|> lastAdapter + 3
+  addBuiltIn s@(_ :|> lastAdapter) = s |> lastAdapter + 3
   go :: Int -> Word -> [Word] -> Memo Word64 Word64
   go _index _ [] = pure 1
   go index outputJolts adapters = withMemo index $ do
     let tails = fittingTails index outputJolts adapters
-    acceptableTails <- for tails $ \(tailIndex, jolts NonEmpty.:| moreAdapters) ->
+    acceptableTails <- for tails $ \(tailIndex, jolts :| moreAdapters) ->
       go tailIndex jolts moreAdapters
     pure $! sum acceptableTails
   fittingTails :: Int -> Word -> [Word] -> [(Int, NonEmpty Word)]
@@ -100,7 +99,7 @@ solve02 ratings =
 -- 396857386627072
 
 -- Poor man's monad transformer
-newtype Memo memo a = Memo { unMemo :: forall s. ReaderT (Array.STArray s Int (Maybe memo)) (ST s) a }
+newtype Memo memo a = Memo {unMemo :: forall s. ReaderT (Array.STArray s Int (Maybe memo)) (ST s) a}
   deriving stock (Functor)
 
 instance Applicative (Memo memo) where
