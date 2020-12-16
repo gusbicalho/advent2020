@@ -14,8 +14,8 @@ import Data.Set qualified as Set
 
 data BoundedSet a = BoundedSet
   { bsElements :: Set a
-  , bsSmallest :: a
-  , bsLargest :: a
+  , _bsSmallest :: a
+  , _bsLargest :: a
   }
 
 singleton :: a -> BoundedSet a
