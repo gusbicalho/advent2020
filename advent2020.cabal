@@ -65,11 +65,20 @@ library
                      , Advent2020.Day09
                      , Advent2020.Day10
                      , Advent2020.Input
-  other-modules:       Advent2020.DayExample
 
 executable day11
   import:              common-options
   hs-source-dirs:      day11
+  main-is:             Main.hs
+  build-depends:       advent2020
+  ghc-options:         -threaded
+                       -rtsopts
+                       -with-rtsopts=-N
+                       -O2
+
+executable day12
+  import:              common-options
+  hs-source-dirs:      day12
   main-is:             Main.hs
   build-depends:       advent2020
   ghc-options:         -threaded
