@@ -2,3 +2,5 @@ cradle:
   cabal:
     - path: "src"
       component: "lib:advent2020"
+    - path: "day11"
+      component: "day11"

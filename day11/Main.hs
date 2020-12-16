@@ -14,7 +14,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Advent2020.Day11 (day11_01, day11_02) where
+module Main (main) where
 
 import Advent2020.Input qualified
 import Control.Applicative
@@ -23,6 +23,11 @@ import Data.Foldable qualified as Foldable
 import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+
+main :: IO ()
+main = do
+  print =<< day11_01
+  print =<< day11_02
 
 day11_01 :: IO Int
 day11_01 = solve01 <$> input

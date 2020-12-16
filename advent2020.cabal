@@ -24,12 +24,7 @@ source-repository head
 
 common common-options
   build-depends:       base ^>= 4.14.0.0
-                     , transformers
                      , containers
-                     , vector
-                     , generic-data
-                     , array
-                     , megaparsec
 
   ghc-options:         -Wall
                        -Wcompat
@@ -54,6 +49,10 @@ common common-options
 library
   import:              common-options
   hs-source-dirs:      src
+  build-depends:       base ^>= 4.14.0.0
+                     , transformers
+                     , array
+                     , megaparsec
   exposed-modules:     Advent2020.BoundedSet
                      , Advent2020.Day01
                      , Advent2020.Day02
@@ -65,16 +64,15 @@ library
                      , Advent2020.Day08
                      , Advent2020.Day09
                      , Advent2020.Day10
-                     , Advent2020.Day11
                      , Advent2020.Input
   other-modules:       Advent2020.DayExample
 
-test-suite advent2020-test
+executable day11
   import:              common-options
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Spec.hs
+  hs-source-dirs:      day11
+  main-is:             Main.hs
   build-depends:       advent2020
   ghc-options:         -threaded
                        -rtsopts
                        -with-rtsopts=-N
+                       -O2
