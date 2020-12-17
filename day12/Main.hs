@@ -40,24 +40,47 @@ solve1 = manhattan . snd . Foldable.foldl' go initialPos . Foldable.toList
  where
   initialPos = (East, (0, 0))
   go :: (Direction, (Int, Int)) -> Op -> (Direction, (Int, Int))
-  go (currentDirection, pos) (OpTurn turnOp) = (turn turnOp currentDirection, pos)
+  go (currentDirection, pos) (OpTurn turnOp) = (rotate turnOp currentDirection, pos)
   go (currentDirection, pos) (OpMove (Towards direction amount)) = (currentDirection, moveTo direction amount pos)
   go (currentDirection, pos) (OpMove (Forward amount)) = (currentDirection, moveTo currentDirection amount pos)
-  manhattan :: (Int, Int) -> Int
-  manhattan (x,y) = abs x + abs y
 
-solve2 :: Seq a -> Int
-solve2 = Seq.length
+-- >>> solve2 example
+-- 286
 
-turn :: Turn -> Direction -> Direction
-turn Cw     West = North
-turn Cw     d = succ d
-turn Ccw    North = West
-turn Ccw    d = pred d
-turn Around North = South
-turn Around South = North
-turn Around East = West
-turn Around West = East
+solve2 :: Seq Op -> Int
+solve2 = manhattan . snd . Foldable.foldl' go initialPos . Foldable.toList
+ where
+  initialPos = (Waypoint (10, -1), (0, 0))
+  go :: (Waypoint, (Int, Int)) -> Op -> (Waypoint, (Int, Int))
+  go (waypoint, pos) (OpTurn turnOp) = (rotateWaypoint turnOp waypoint, pos)
+  go (waypoint, pos) (OpMove (Towards direction amount)) = (moveWaypointTo direction amount waypoint, pos)
+  go (waypoint, pos) (OpMove (Forward amount)) = (waypoint, toWaypoint amount waypoint pos)
+
+manhattan :: (Int, Int) -> Int
+manhattan (x, y) = abs x + abs y
+
+newtype Waypoint = Waypoint {unWaypoint :: (Int, Int)}
+
+rotateWaypoint :: Turn -> Waypoint -> Waypoint
+rotateWaypoint Around (Waypoint (dx, dy)) = Waypoint (-dx, -dy)
+rotateWaypoint Cw (Waypoint (dx, dy)) = Waypoint (-dy, dx)
+rotateWaypoint Ccw (Waypoint (dx, dy)) = Waypoint (dy, -dx)
+
+moveWaypointTo :: Direction -> Int -> Waypoint -> Waypoint
+moveWaypointTo direction i = Waypoint . moveTo direction i . unWaypoint
+
+toWaypoint :: Int -> Waypoint -> (Int, Int) -> (Int, Int)
+toWaypoint times (Waypoint (dx, dy)) (x, y) = (x + times * dx, y + times * dy)
+
+rotate :: Turn -> Direction -> Direction
+rotate Cw West = North
+rotate Cw d = succ d
+rotate Ccw North = West
+rotate Ccw d = pred d
+rotate Around North = South
+rotate Around South = North
+rotate Around East = West
+rotate Around West = East
 
 moveTo :: Direction -> Int -> (Int, Int) -> (Int, Int)
 moveTo direction i (x, y) = (x + dx, y + dy)

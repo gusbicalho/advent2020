@@ -46,8 +46,23 @@ common common-options
 
   default-language:    Haskell2010
 
+common optimize-a-lot
+  ghc-options:         -O2
+                       -foptimal-applicative-do
+                       -fexpose-all-unfoldings
+                       -fspecialise-aggressively
+                       -fcross-module-specialise
+                       -flate-specialise
+
+common optimized-executable
+  import:              optimize-a-lot
+  ghc-options:         -threaded
+                       -rtsopts
+                       -with-rtsopts=-N
+
 library
   import:              common-options
+  import:              optimize-a-lot
   hs-source-dirs:      src
   build-depends:       base ^>= 4.14.0.0
                      , transformers
@@ -68,20 +83,14 @@ library
 
 executable day11
   import:              common-options
+  import:              optimized-executable
   hs-source-dirs:      day11
   main-is:             Main.hs
   build-depends:       advent2020
-  ghc-options:         -threaded
-                       -rtsopts
-                       -with-rtsopts=-N
-                       -O2
 
 executable day12
   import:              common-options
+  import:              optimized-executable
   hs-source-dirs:      day12
   main-is:             Main.hs
   build-depends:       advent2020
-  ghc-options:         -threaded
-                       -rtsopts
-                       -with-rtsopts=-N
-                       -O2
