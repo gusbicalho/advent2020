@@ -101,3 +101,4 @@ executable day13
   hs-source-dirs:      day13
   main-is:             Main.hs
   build-depends:       advent2020
+                     , primes
