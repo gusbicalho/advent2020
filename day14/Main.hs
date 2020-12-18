@@ -39,4 +39,4 @@ example :: Seq [Char]
 example = Seq.fromList [""]
 
 input :: IO (Seq String)
-input = Advent2020.Input.loadInput Just "dayTemplate/input"
+input = Advent2020.Input.loadInput Just "day14/input"
