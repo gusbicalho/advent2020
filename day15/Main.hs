@@ -17,17 +17,11 @@
 module Main (main) where
 
 import Control.Arrow (Arrow ((&&&)))
-import Control.Monad ((>=>))
 import Data.Foldable qualified as Foldable
-import Data.Functor ((<&>))
-import Data.List qualified as List
-import Data.List.NonEmpty qualified as NonEmpty
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.Ord (comparing)
 import Data.Sequence (Seq ((:<|)))
 import Data.Sequence qualified as Seq
-import System.IO (hFlush, stdout)
 
 main :: IO ()
 main = do
@@ -36,41 +30,25 @@ main = do
     putStrLn . ("example " <>) . show . (Foldable.toList &&& solve1) $ example
   putStrLn . ("for real: " <>) . show . solve1 $ input
   putStrLn "Part 2"
-  Foldable.for_ examples $ \example -> do
-    putStrLn . ("example " <>) . show . (Foldable.toList &&& solve2) $ example
-    hFlush stdout
+  -- Foldable.for_ examples $ \example -> do
+  --   putStrLn . ("example " <>) . show . (Foldable.toList &&& solve2) $ example
   putStrLn . ("for real: " <>) . show . solve2 $ input
 
--- >>> (id &&& solve1) <$> examples
--- [(fromList [0,3,6],436),(fromList [1,3,2],1),(fromList [2,1,3],10),(fromList [1,2,3],27),(fromList [2,3,1],78),(fromList [3,2,1],438),(fromList [3,1,2],1836)]
-
 solve1 :: Seq Word -> Word
-solve1 = (!! 2020) . generate
+solve1 = solve (2020 - 1)
 
-solve2 :: Seq Word -> Maybe Word
-solve2 = solve 30000000
+solve2 :: Seq Word -> Word
+solve2 = solve (30000000 - 1)
 
-solve :: Word -> Seq Word -> Maybe Word
-solve ix =
-  loadPrefix
-    .> fmap
-      ( iterate go
-          .> dropWhile ((< ix) . fst . fst)
-          .> head
-          .> snd
-      )
- where
-  (.>) = flip (.)
-  go :: ((Word, Map Word Word), Word) -> ((Word, Map Word Word), Word)
-  go ((index, memory), latest) =
-    let nextState = (succ index, Map.insert latest index memory)
-     in case Map.lookup latest memory of
-          Nothing -> (nextState, 0)
-          Just previousIndex -> (nextState, index - previousIndex)
+solve :: Int -> Seq Word -> Word
+solve ix = (!! ix) . generate
+
+-- >>> solve1 . Seq.fromList $ [0,3,6]
+-- 436
 
 generate :: Seq Word -> [Word]
 generate ws =
-  Foldable.toList ws ++ maybe [] (fmap snd . iterate go) (loadPrefix ws)
+  Foldable.toList ws ++ maybe [] (fmap snd . drop 1 . iterate go) (loadPrefix ws)
  where
   go :: ((Word, Map Word Word), Word) -> ((Word, Map Word Word), Word)
   go ((index, memory), latest) =

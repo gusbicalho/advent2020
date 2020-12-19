@@ -15,7 +15,6 @@ copyright:           2020 Gustavo Bicalho
 category:            Utility
 build-type:          Simple
 extra-doc-files:     README.md
-                     CHANGELOG.md
 tested-with:         GHC == 8.10.2
 
 source-repository head
@@ -47,8 +46,7 @@ common common-options
   default-language:    Haskell2010
 
 common optimize-a-lot
-  ghc-options:         -O2
-                       -foptimal-applicative-do
+  ghc-options:         -foptimal-applicative-do
                        -fexpose-all-unfoldings
                        -fspecialise-aggressively
                        -fcross-module-specialise
@@ -114,4 +112,3 @@ executable day15
   import:              optimized-executable
   hs-source-dirs:      day15
   main-is:             Main.hs
-  build-depends:       advent2020
