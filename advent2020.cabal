@@ -24,12 +24,7 @@ source-repository head
 
 common common-options
   build-depends:       base ^>= 4.14.0.0
-                     , transformers
                      , containers
-                     , vector
-                     , generic-data
-                     , array
-                     , megaparsec
 
   ghc-options:         -Wall
                        -Wcompat
@@ -51,9 +46,28 @@ common common-options
 
   default-language:    Haskell2010
 
+common optimize-a-lot
+  ghc-options:         -O2
+                       -foptimal-applicative-do
+                       -fexpose-all-unfoldings
+                       -fspecialise-aggressively
+                       -fcross-module-specialise
+                       -flate-specialise
+
+common optimized-executable
+  import:              optimize-a-lot
+  ghc-options:         -threaded
+                       -rtsopts
+                       -with-rtsopts=-N
+
 library
   import:              common-options
+  import:              optimize-a-lot
   hs-source-dirs:      src
+  build-depends:       base ^>= 4.14.0.0
+                     , transformers
+                     , array
+                     , megaparsec
   exposed-modules:     Advent2020.BoundedSet
                      , Advent2020.Day01
                      , Advent2020.Day02
@@ -66,14 +80,31 @@ library
                      , Advent2020.Day09
                      , Advent2020.Day10
                      , Advent2020.Input
-  other-modules:       Advent2020.DayExample
 
-test-suite advent2020-test
+executable day11
   import:              common-options
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Spec.hs
+  import:              optimized-executable
+  hs-source-dirs:      day11
+  main-is:             Main.hs
   build-depends:       advent2020
-  ghc-options:         -threaded
-                       -rtsopts
-                       -with-rtsopts=-N
+
+executable day12
+  import:              common-options
+  import:              optimized-executable
+  hs-source-dirs:      day12
+  main-is:             Main.hs
+  build-depends:       advent2020
+
+executable day13
+  import:              common-options
+  import:              optimized-executable
+  hs-source-dirs:      day13
+  main-is:             Main.hs
+  build-depends:       advent2020
+
+executable day14
+  import:              common-options
+  import:              optimized-executable
+  hs-source-dirs:      day14
+  main-is:             Main.hs
+  build-depends:       advent2020
