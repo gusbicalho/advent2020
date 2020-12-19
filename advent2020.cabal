@@ -108,3 +108,10 @@ executable day14
   hs-source-dirs:      day14
   main-is:             Main.hs
   build-depends:       advent2020
+
+executable day15
+  import:              common-options
+  import:              optimized-executable
+  hs-source-dirs:      day15
+  main-is:             Main.hs
+  build-depends:       advent2020
