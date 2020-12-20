@@ -26,12 +26,12 @@ import Data.HashTable.ST.Linear (HashTable)
 import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.Ratio ((%))
 import Data.STRef.Strict (STRef)
 import Data.STRef.Strict qualified as STRef
 import Data.Sequence (Seq ((:<|)))
 import Data.Sequence qualified as Seq
 import System.CPUTime (getCPUTime)
+import Text.Printf (printf)
 
 main :: IO ()
 main = do
@@ -56,8 +56,8 @@ main = do
     start <- getCPUTime
     !result <- action
     end <- getCPUTime
-    let diff = fromRational @Double $ (end - start) % (10 ^ (12 :: Integer))
-    putStrLn $ label <> " - Computation time: " <> show diff <> " s"
+    let diff = fromIntegral (end - start) / (10 ^ (12 :: Integer)) :: Double
+    printf "%s - Computation time: %0.4f s\n" label diff
     pure result
 
 solve1 :: (Int -> Seq Word -> Word) -> Seq Word -> Word
