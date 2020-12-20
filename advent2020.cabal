@@ -113,3 +113,11 @@ executable day15
   hs-source-dirs:      day15
   main-is:             Main.hs
   build-depends:       hashtables
+
+executable day16
+  import:              common-options
+  import:              optimized-executable
+  hs-source-dirs:      day16
+  main-is:             Main.hs
+  build-depends:       advent2020
+                     , megaparsec
