@@ -30,48 +30,43 @@ main = do
     putStrLn . ("example " <>) . show . (Foldable.toList &&& solve1) $ example
   putStrLn . ("for real: " <>) . show . solve1 $ input
   putStrLn "Part 2"
-  -- Foldable.for_ examples $ \example -> do
-  --   putStrLn . ("example " <>) . show . (Foldable.toList &&& solve2) $ example
   putStrLn . ("for real: " <>) . show . solve2 $ input
 
 solve1 :: Seq Word -> Word
-solve1 = solveIt (2020 - 1)
+solve1 = solveWithCountdown (2020 - 1)
 
 solve2 :: Seq Word -> Word
-solve2 = solveIt (30000000 - 1)
+solve2 = solveWithCountdown (30000000 - 1)
 
-solve :: Int -> Seq Word -> Word
-solve ix = (!! ix) . generate
-
--- >>> solve1 . Seq.fromList $ [0,3,6]
+-- >>> solveWithCountdown (2020 - 1) . Seq.fromList $ [0,3,6]
 -- 436
-
-solveIt :: Int -> Seq Word -> Word
-solveIt ix ws = case loadPrefix ws of
+-- main:   131.37s user 76.29s system 239% cpu 1:26.76 total
+solveWithCountdown :: Int -> Seq Word -> Word
+solveWithCountdown ix ws = case loadPrefix ws of
   Nothing -> error "empty prefix"
-  Just prefix -> snd $ runTimes (ix + 1 - Seq.length ws) go prefix
+  Just prefix -> snd $ runTimes (ix + 1 - Seq.length ws) step prefix
  where
   runTimes :: Int -> (a -> a) -> a -> a
   runTimes !n f zero
     | n <= 0 = zero
     | otherwise = runTimes (pred n) f (f zero)
-  go :: ((Word, Map Word Word), Word) -> ((Word, Map Word Word), Word)
-  go ((!index, !memory), !latest) =
-    let nextState = (succ index, Map.insert latest index memory)
-     in case Map.lookup latest memory of
-          Nothing -> (nextState, 0)
-          Just previousIndex -> (nextState, index - previousIndex)
 
-generate :: Seq Word -> [Word]
-generate ws =
-  Foldable.toList ws ++ maybe [] (fmap snd . drop 1 . iterate go) (loadPrefix ws)
- where
-  go :: ((Word, Map Word Word), Word) -> ((Word, Map Word Word), Word)
-  go ((!index, !memory), !latest) =
-    let nextState = (succ index, Map.insert latest index memory)
-     in case Map.lookup latest memory of
-          Nothing -> (nextState, 0)
-          Just previousIndex -> (nextState, index - previousIndex)
+-- >>> solveWithIterate (2020 - 1) . Seq.fromList $ [0,3,6]
+-- 436
+-- Should be the same as solveWithCountdown due to lazyness,
+-- but it's actually much worse ¯\_(ツ)_/¯
+--   324.97s user 270.48s system 311% cpu 3:11.11 total
+solveWithIterate :: Int -> Seq Word -> Word
+solveWithIterate ix ws = case loadPrefix ws of
+  Nothing -> error "empty prefix"
+  Just prefix -> snd . (!! (ix + 1 - Seq.length ws)) . iterate step $ prefix
+
+step :: ((Word, Map Word Word), Word) -> ((Word, Map Word Word), Word)
+step ((!index, !memory), !latest) =
+  let nextState = (succ index, Map.insert latest index memory)
+    in case Map.lookup latest memory of
+        Nothing -> (nextState, 0)
+        Just previousIndex -> (nextState, index - previousIndex)
 
 loadPrefix :: Seq Word -> Maybe ((Word, Map Word Word), Word)
 loadPrefix = \case
