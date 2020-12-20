@@ -17,61 +17,105 @@
 module Main (main) where
 
 import Control.Arrow (Arrow ((&&&)))
+import Control.Monad.ST.Strict (ST)
+import Control.Monad.ST.Strict qualified as ST
 import Data.Foldable qualified as Foldable
+import Data.Functor (($>))
+import Data.HashTable.Class qualified as HashTable
+import Data.HashTable.ST.Linear (HashTable)
+import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Ratio ((%))
+import Data.STRef.Strict (STRef)
+import Data.STRef.Strict qualified as STRef
 import Data.Sequence (Seq ((:<|)))
 import Data.Sequence qualified as Seq
+import System.CPUTime (getCPUTime)
 
 main :: IO ()
 main = do
   putStrLn "Part 1"
-  Foldable.for_ examples $ \example ->
-    putStrLn . ("example " <>) . show . (Foldable.toList &&& solve1) $ example
-  putStrLn . ("for real: " <>) . show . solve1 $ input
+  part1 "solveWithMutableHashtable" solveWithMutableHashtable
+  part1 "solveWithIterate" solveWithIterate
   putStrLn "Part 2"
-  putStrLn . ("for real: " <>) . show . solve2 $ input
-
-solve1 :: Seq Word -> Word
-solve1 = solveWithCountdown (2020 - 1)
-
-solve2 :: Seq Word -> Word
-solve2 = solveWithCountdown (30000000 - 1)
-
--- >>> solveWithCountdown (2020 - 1) . Seq.fromList $ [0,3,6]
--- 436
--- main:   131.37s user 76.29s system 239% cpu 1:26.76 total
-solveWithCountdown :: Int -> Seq Word -> Word
-solveWithCountdown ix ws = case loadPrefix ws of
-  Nothing -> error "empty prefix"
-  Just prefix -> snd $ runTimes (ix + 1 - Seq.length ws) step prefix
+  part2 "solveWithMutableHashtable" solveWithMutableHashtable
+  part2 "solveWithIterate" solveWithIterate
  where
-  runTimes :: Int -> (a -> a) -> a -> a
-  runTimes !n f zero
-    | n <= 0 = zero
-    | otherwise = runTimes (pred n) f (f zero)
+  part1 label solver =
+    timing label $ do
+      Foldable.for_ examples $ \example ->
+        putStrLn . ("example " <>) . show . (Foldable.toList &&& solve1 solver) $ example
+      putStrLn . ("for real: " <>) . show . solve1 solver $ input
+  part2 label solver =
+    timing label $ do
+      putStrLn . ("for real: " <>) . show . solve2 solver $ input
+  timing :: String -> IO a -> IO a
+  timing label action = do
+    putStrLn $ label <> " - begin"
+    start <- getCPUTime
+    !result <- action
+    end <- getCPUTime
+    let diff = fromRational @Double $ (end - start) % (10 ^ (12 :: Integer))
+    putStrLn $ label <> " - Computation time: " <> show diff <> " s"
+    pure result
+
+solve1 :: (Int -> Seq Word -> Word) -> Seq Word -> Word
+solve1 solver = solver (2020 - 1)
+
+solve2 :: (Int -> Seq Word -> Word) -> Seq Word -> Word
+solve2 solver = solver (30000000 - 1)
+
+-- >>> solveWithMutableHashtable (2020 - 1) . Seq.fromList $ [0,3,6]
+-- 436
+-- Good performance with HashTable.ST.Linear, other options didn't perform well.
+-- No idea why.
+-- This seems to be ~25% faster than the immutable-Map-based solution below.
+solveWithMutableHashtable :: Int -> Seq Word -> Word
+solveWithMutableHashtable ix ws = ST.runST $ do
+  let ((prefixIndex, prefixMemory), latest) = loadPrefix ws
+  memory_' <- HashTable.new
+  Foldable.for_ (Map.toAscList prefixMemory) $
+    uncurry (HashTable.insert memory_')
+  index_' <- STRef.newSTRef prefixIndex
+  doTimes (ix + 1 - Seq.length ws) (stepOnST index_' memory_') latest
+ where
+  doTimes :: Monad m => Int -> (a -> m a) -> a -> m a
+  doTimes !n f zero
+    | n <= 0 = pure zero
+    | otherwise = f zero >>= doTimes (pred n) f
+  stepOnST :: STRef s Word -> HashTable s Word Word -> Word -> ST s Word
+  stepOnST index_' memory_' latest = do
+    index <- STRef.readSTRef index_'
+    let next = do
+          STRef.modifySTRef' index_' succ
+          HashTable.insert memory_' latest index
+    HashTable.lookup memory_' latest >>= \case
+      Nothing -> next $> 0
+      Just previousIndex -> next $> index - previousIndex
 
 -- >>> solveWithIterate (2020 - 1) . Seq.fromList $ [0,3,6]
 -- 436
--- Should be the same as solveWithCountdown due to lazyness,
--- but it's actually much worse ¯\_(ツ)_/¯
---   324.97s user 270.48s system 311% cpu 3:11.11 total
+-- At first i implemented this with Prelude.iterate, but that caused a space leak!
+-- It was very slow and sometimes it even died because OOM.
+-- I think it's because !! only force the spine of the list, so the ix-th item
+-- would have a huge tower of thunks, all holding on to the previous states.
+-- List.iterate' forces each item on the list, so when we get to the ix-th item,
+-- it's just a plain Word.
 solveWithIterate :: Int -> Seq Word -> Word
-solveWithIterate ix ws = case loadPrefix ws of
-  Nothing -> error "empty prefix"
-  Just prefix -> snd . (!! (ix + 1 - Seq.length ws)) . iterate step $ prefix
+solveWithIterate ix ws = snd . (!! (ix + 1 - Seq.length ws)) . List.iterate' step $ loadPrefix ws
 
 step :: ((Word, Map Word Word), Word) -> ((Word, Map Word Word), Word)
 step ((!index, !memory), !latest) =
   let nextState = (succ index, Map.insert latest index memory)
-    in case Map.lookup latest memory of
+   in case Map.lookup latest memory of
         Nothing -> (nextState, 0)
         Just previousIndex -> (nextState, index - previousIndex)
 
-loadPrefix :: Seq Word -> Maybe ((Word, Map Word Word), Word)
+loadPrefix :: Seq Word -> ((Word, Map Word Word), Word)
 loadPrefix = \case
-  Seq.Empty -> Nothing
-  x :<| xs -> Just $ goPrefix ((1, Map.empty), x) xs
+  Seq.Empty -> error "empty prefix"
+  x :<| xs -> goPrefix ((1, Map.empty), x) xs
  where
   goPrefix state Seq.Empty = state
   goPrefix ((!index, !memory), !latest) (x :<| xs) =
