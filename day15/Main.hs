@@ -35,10 +35,10 @@ main = do
   putStrLn . ("for real: " <>) . show . solve2 $ input
 
 solve1 :: Seq Word -> Word
-solve1 = solve (2020 - 1)
+solve1 = solveIt (2020 - 1)
 
 solve2 :: Seq Word -> Word
-solve2 = solve (30000000 - 1)
+solve2 = solveIt (30000000 - 1)
 
 solve :: Int -> Seq Word -> Word
 solve ix = (!! ix) . generate
@@ -46,12 +46,28 @@ solve ix = (!! ix) . generate
 -- >>> solve1 . Seq.fromList $ [0,3,6]
 -- 436
 
+solveIt :: Int -> Seq Word -> Word
+solveIt ix ws = case loadPrefix ws of
+  Nothing -> error "empty prefix"
+  Just prefix -> snd $ runTimes (ix + 1 - Seq.length ws) go prefix
+ where
+  runTimes :: Int -> (a -> a) -> a -> a
+  runTimes !n f zero
+    | n <= 0 = zero
+    | otherwise = runTimes (pred n) f (f zero)
+  go :: ((Word, Map Word Word), Word) -> ((Word, Map Word Word), Word)
+  go ((!index, !memory), !latest) =
+    let nextState = (succ index, Map.insert latest index memory)
+     in case Map.lookup latest memory of
+          Nothing -> (nextState, 0)
+          Just previousIndex -> (nextState, index - previousIndex)
+
 generate :: Seq Word -> [Word]
 generate ws =
   Foldable.toList ws ++ maybe [] (fmap snd . drop 1 . iterate go) (loadPrefix ws)
  where
   go :: ((Word, Map Word Word), Word) -> ((Word, Map Word Word), Word)
-  go ((index, memory), latest) =
+  go ((!index, !memory), !latest) =
     let nextState = (succ index, Map.insert latest index memory)
      in case Map.lookup latest memory of
           Nothing -> (nextState, 0)
@@ -63,7 +79,7 @@ loadPrefix = \case
   x :<| xs -> Just $ goPrefix ((1, Map.empty), x) xs
  where
   goPrefix state Seq.Empty = state
-  goPrefix ((index, memory), latest) (x :<| xs) =
+  goPrefix ((!index, !memory), !latest) (x :<| xs) =
     goPrefix ((succ index, Map.insert latest index memory), x) xs
 
 examples :: [Seq Word]
