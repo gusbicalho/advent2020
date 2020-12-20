@@ -30,8 +30,9 @@ import Data.STRef.Strict (STRef)
 import Data.STRef.Strict qualified as STRef
 import Data.Sequence (Seq ((:<|)))
 import Data.Sequence qualified as Seq
-import System.CPUTime (getCPUTime)
-import Text.Printf (printf)
+import Formatting qualified
+import Formatting.Clock qualified
+import System.Clock qualified as Clock
 
 main :: IO ()
 main = do
@@ -53,11 +54,13 @@ main = do
   timing :: String -> IO a -> IO a
   timing label action = do
     putStrLn $ label <> " - begin"
-    start <- getCPUTime
+    start <- Clock.getTime Clock.Monotonic
     !result <- action
-    end <- getCPUTime
-    let diff = fromIntegral (end - start) / (10 ^ (12 :: Integer)) :: Double
-    printf "%s - Computation time: %0.4f s\n" label diff
+    end <- Clock.getTime Clock.Monotonic
+    putStrLn $
+      label
+        <> " - Computation time: "
+        <> Formatting.formatToString Formatting.Clock.timeSpecs start end
     pure result
 
 solve1 :: (Int -> Seq Word -> Word) -> Seq Word -> Word
