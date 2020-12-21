@@ -127,4 +127,4 @@ executable day17
   import:              optimized-executable
   hs-source-dirs:      day17
   main-is:             Main.hs
-  build-depends:       advent2020, transformers
+  build-depends:       advent2020
