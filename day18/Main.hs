@@ -16,15 +16,14 @@
 
 module Main (main) where
 
-import Prelude hiding (exp)
 import Advent2020.Input qualified
 import Data.Char qualified as Char
+import Data.Foldable qualified as Foldable
 import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Text.Read qualified as Read
-import qualified Data.Foldable as Foldable
-import Data.Monoid (Sum(Sum, getSum))
+import Prelude hiding (exp)
 
 main :: IO ()
 main = do
@@ -39,7 +38,7 @@ main = do
 -- 26406
 
 solve1 :: Seq (Seq Lexeme) -> Word
-solve1 = getSum . Foldable.foldMap' (either (const 0) Sum) . fmap (parseExp1 @Word)
+solve1 = Foldable.sum . fmap (either (const 0) id . parseExp1 @Word)
 
 parseExp1 :: forall e t. (Foldable t, Exp e) => t Lexeme -> Either String e
 parseExp1 = fmap snd . exp . Foldable.toList
@@ -51,9 +50,10 @@ parseExp1 = fmap snd . exp . Foldable.toList
     binaryOpTail e moreLs
   term :: [Lexeme] -> Either String ([Lexeme], e)
   term (Number i : ls) = Right (ls, number i)
-  term (LeftParen : ls) = exp ls >>= \case
-    (RightParen : moreLs, e) -> Right (moreLs, e)
-    (moreLs, _) -> Left $ "Expected RightParen, found " <> show moreLs
+  term (LeftParen : ls) =
+    exp ls >>= \case
+      (RightParen : moreLs, e) -> Right (moreLs, e)
+      (moreLs, _) -> Left $ "Expected RightParen, found " <> show moreLs
   term ls = Left $ "Expected LeftParen or Number, found " <> show ls
   binaryOpTail :: e -> [Lexeme] -> Either String ([Lexeme], e)
   binaryOpTail leftTerm (Operator op : ls) = do
@@ -63,8 +63,37 @@ parseExp1 = fmap snd . exp . Foldable.toList
   binaryOpTail leftTerm [] = Right ([], leftTerm)
   binaryOpTail _ ls = Left $ "Expected Operator, found " <> show ls
 
-solve2 :: Seq a -> Int
-solve2 = Seq.length
+solve2 :: Seq (Seq Lexeme) -> Word
+solve2 = Foldable.sum . fmap (either (const 0) id . parseExp2 @Word)
+
+parseExp2 :: forall e t. (Foldable t, Exp e) => t Lexeme -> Either String e
+parseExp2 = fmap snd . exp . Foldable.toList
+ where
+  -- ls, moreLs :: [Lexeme]
+  exp = productExp
+  productExp :: [Lexeme] -> Either String ([Lexeme], e)
+  productExp ls = do
+    (moreLs, leftTerm) <- sumExp ls
+    case moreLs of
+      (Operator Times : moreLs) -> do
+        (moreLs, rightTerm) <- productExp moreLs
+        pure (moreLs, evalOp Times leftTerm rightTerm)
+      moreLs -> pure (moreLs, leftTerm)
+  sumExp :: [Lexeme] -> Either String ([Lexeme], e)
+  sumExp ls = do
+    (moreLs, leftTerm) <- term ls
+    case moreLs of
+      (Operator Plus : moreLs) -> do
+        (moreLs, rightTerm) <- sumExp moreLs
+        pure (moreLs, evalOp Plus leftTerm rightTerm)
+      moreLs -> pure (moreLs, leftTerm)
+  term :: [Lexeme] -> Either String ([Lexeme], e)
+  term (Number i : ls) = Right (ls, number i)
+  term (LeftParen : ls) =
+    exp ls >>= \case
+      (RightParen : moreLs, e) -> Right (moreLs, e)
+      (moreLs, _) -> Left $ "Expected RightParen, found " <> show moreLs
+  term ls = Left $ "Expected LeftParen or Number, found " <> show ls
 
 class Exp e where
   number :: Word -> e
@@ -79,6 +108,16 @@ instance Exp Word where
   number = id
   times = (*)
   plus = (+)
+
+instance Exp AST where
+  number = ANum
+  times = ABinOp Times
+  plus = ABinOp Plus
+
+data AST
+  = ANum Word
+  | ABinOp Operator AST AST
+  deriving stock (Eq, Ord, Show)
 
 data Operator = Plus | Times
   deriving stock (Eq, Ord, Show)
