@@ -19,6 +19,7 @@ module Main (main) where
 import Advent2020.Input qualified
 import Data.Char qualified as Char
 import Data.Foldable qualified as Foldable
+import Data.Function ((&))
 import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
@@ -66,28 +67,21 @@ parseExp1 = fmap snd . exp . Foldable.toList
 solve2 :: Seq (Seq Lexeme) -> Word
 solve2 = Foldable.sum . fmap (either (const 0) id . parseExp2 @Word)
 
+type ExpParser e = [Lexeme] -> Either String ([Lexeme], e)
+
 parseExp2 :: forall e t. (Foldable t, Exp e) => t Lexeme -> Either String e
 parseExp2 = fmap snd . exp . Foldable.toList
  where
   -- ls, moreLs :: [Lexeme]
-  exp = productExp
-  productExp :: [Lexeme] -> Either String ([Lexeme], e)
-  productExp ls = do
-    (moreLs, leftTerm) <- sumExp ls
-    case moreLs of
-      (Operator Times : moreLs) -> do
-        (moreLs, rightTerm) <- productExp moreLs
-        pure (moreLs, evalOp Times leftTerm rightTerm)
-      moreLs -> pure (moreLs, leftTerm)
-  sumExp :: [Lexeme] -> Either String ([Lexeme], e)
-  sumExp ls = do
-    (moreLs, leftTerm) <- term ls
-    case moreLs of
-      (Operator Plus : moreLs) -> do
-        (moreLs, rightTerm) <- sumExp moreLs
-        pure (moreLs, evalOp Plus leftTerm rightTerm)
-      moreLs -> pure (moreLs, leftTerm)
-  term :: [Lexeme] -> Either String ([Lexeme], e)
+  exp = binaryRightAssociativeOps [Times, Plus] term
+  binaryRightAssociativeOps :: [Operator] -> ExpParser e -> ExpParser e
+  binaryRightAssociativeOps [] termParser ls = termParser ls
+  binaryRightAssociativeOps ops@(op : higherPrecedenceOps) termParser ls =
+    binaryRightAssociativeOps higherPrecedenceOps termParser ls >>= \case
+      (Operator foundOp : moreLs, leftTerm) | foundOp == op ->
+        (evalOp op leftTerm <$>) <$> binaryRightAssociativeOps ops termParser moreLs
+      result -> pure result
+  term :: ExpParser e
   term (Number i : ls) = Right (ls, number i)
   term (LeftParen : ls) =
     exp ls >>= \case

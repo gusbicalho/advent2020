@@ -134,4 +134,4 @@ executable day18
   import:              optimized-executable
   hs-source-dirs:      day18
   main-is:             Main.hs
-  build-depends:       advent2020, megaparsec
+  build-depends:       advent2020
