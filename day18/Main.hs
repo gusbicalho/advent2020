@@ -1,9 +1,12 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Main (main) where
 
@@ -112,6 +115,12 @@ instance Exp AST where
   number = ANum
   times = ABinOp Times
   plus = ABinOp Plus
+
+instance Exp String where
+  number w = show w
+  times a b = "(" <> a <> " * " <> b <> ")"
+  plus a b = "(" <> a <> " + " <> b <> ")"
+
 
 data AST
   = ANum Word
