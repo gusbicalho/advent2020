@@ -35,7 +35,7 @@ solve1 = Seq.length
 solve2 :: Seq a -> Int
 solve2 = Seq.length
 
-example :: Seq [Char]
+example :: Seq String
 example = Seq.fromList [""]
 
 input :: IO (Seq String)
