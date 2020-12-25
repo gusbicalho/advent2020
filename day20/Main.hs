@@ -48,9 +48,10 @@ solve2 = Seq.length
 solveTiles :: [Tile] -> Maybe (Seq (Seq Tile))
 solveTiles tiles = do
   (corner, _) <- List.find isCorner matchList
-  let (borderRow, remaining) = goRow (ignoringOrder matchH) [] corner (remove (sameTileIdAs corner . fst) matchList)
-  let (cols, remaining') = goCols [] borderRow remaining
-  guard (null remaining')
+  let remaining = remove (sameTileIdAs corner . fst) matchList
+      (borderRow, remaining') = goRow (ignoringOrder matchH) [] corner remaining
+      (cols, remaining'') = goCols [] borderRow remaining'
+  guard (null remaining'')
   pure $ Seq.fromList $ Seq.fromList <$> cols
  where
   remove p = filter (not . p)
@@ -59,30 +60,29 @@ solveTiles tiles = do
     case Maybe.mapMaybe (checkForMatch matcher headTile) possibleTiles of
       [] -> (reverse $ headTile : rowTiles, possibleTiles)
       (t : _) -> goRow matcher (headTile : rowTiles) t (remove (sameTileIdAs t . fst) possibleTiles)
-  checkForMatch matcher t (t2, (t2up, t2right, t2down, t2left)) =
-    if any (sameTileIdAs t) $ Maybe.catMaybes [t2up, t2right, t2down, t2left]
+  checkForMatch matcher t (t2, t2matches) =
+    if any (sameTileIdAs t) t2matches
       then lookForMatch matcher t t2
       else Nothing
   goCols acc [] possibleTiles = (acc, possibleTiles)
   goCols acc (colHead : moreColHeads) possibleTiles =
     let (col, remaining) = goRow (ignoringOrder matchV) [] colHead possibleTiles
      in goCols (col : acc) moreColHeads remaining
-  isCorner (_, (up, right, down, left)) =
-    (Maybe.isJust up /= Maybe.isJust down) && (Maybe.isJust left /= Maybe.isJust right)
-  matchList :: [(Tile, (Maybe Tile, Maybe Tile, Maybe Tile, Maybe Tile))]
+  isCorner (_, [_, _]) = True
+  isCorner _ = False
+  matchList :: [(Tile, [Tile])]
   matchList = fmap (id &&& matchesFor) tiles
-  ignoringOrder matcher t1 t2 = matcher t1 t2 || matcher t2 t1
   matchesFor tile =
-    ( Maybe.listToMaybe $ Maybe.mapMaybe (lookForMatch (flip matchV) tile) $ remove (sameTileIdAs tile) tiles
-    , Maybe.listToMaybe $ Maybe.mapMaybe (lookForMatch matchH tile) $ remove (sameTileIdAs tile) tiles
-    , Maybe.listToMaybe $ Maybe.mapMaybe (lookForMatch matchV tile) $ remove (sameTileIdAs tile) tiles
-    , Maybe.listToMaybe $ Maybe.mapMaybe (lookForMatch (flip matchH) tile) $ remove (sameTileIdAs tile) tiles
-    )
+    Maybe.mapMaybe (lookForMatch (ignoringOrder matchAny) tile)
+      . remove (sameTileIdAs tile)
+      $ tiles
   lookForMatch matcher tg1 tg2 =
     Maybe.listToMaybe $ do
       tg2' <- flips tg2
       guard (matcher tg1 tg2')
       pure tg2'
+  ignoringOrder matcher t1 t2 = matcher t1 t2 || matcher t2 t1
+  matchAny t1 t2 = matchV t1 t2 || matchH t1 t2
 
 fourCorners :: Seq (Seq a) -> [a]
 fourCorners = firstAndLast >=> firstAndLast
@@ -90,54 +90,51 @@ fourCorners = firstAndLast >=> firstAndLast
   firstAndLast (f Seq.:<| (_ Seq.:|> l)) = [f, l]
   firstAndLast _ = []
 
-instance Piece Tile where
-  matchH Tile{tileData = td1} Tile{tileData = td2} =
-    Maybe.mapMaybe seqLast (Foldable.toList td1) == Maybe.mapMaybe seqFirst (Foldable.toList td2)
-   where
-    seqLast (_ Seq.:|> l) = Just l
-    seqLast _ = Nothing
-    seqFirst (f Seq.:<| _) = Just f
-    seqFirst _ = Nothing
+matchH :: Tile -> Tile -> Bool
+matchH Tile{tileData = td1} Tile{tileData = td2} =
+  Maybe.mapMaybe seqLast (Foldable.toList td1) == Maybe.mapMaybe seqFirst (Foldable.toList td2)
+ where
+  seqLast (_ Seq.:|> l) = Just l
+  seqLast _ = Nothing
+  seqFirst (f Seq.:<| _) = Just f
+  seqFirst _ = Nothing
 
-  matchV Tile{tileData = td1} Tile{tileData = td2} =
-    seqLast td1 == seqFirst td2
-   where
-    seqLast (_ Seq.:|> l) = Just l
-    seqLast _ = Nothing
-    seqFirst (f Seq.:<| _) = Just f
-    seqFirst _ = Nothing
+matchV :: Tile -> Tile -> Bool
+matchV Tile{tileData = td1} Tile{tileData = td2} =
+  seqLast td1 == seqFirst td2
+ where
+  seqLast (_ Seq.:|> l) = Just l
+  seqLast _ = Nothing
+  seqFirst (f Seq.:<| _) = Just f
+  seqFirst _ = Nothing
 
-  flipX tile@Tile{tileData} = tile{tileData = fmap Seq.reverse tileData}
+flipX :: Tile -> Tile
+flipX tile@Tile{tileData} = tile{tileData = fmap Seq.reverse tileData}
 
-  flipY tile@Tile{tileData} = tile{tileData = Seq.reverse tileData}
+flipY :: Tile -> Tile
+flipY tile@Tile{tileData} = tile{tileData = Seq.reverse tileData}
 
-  transpose tile@Tile{tileData} = tile{tileData = transposed}
-   where
-    transposed =
-      Seq.fromList . flip fmap [0 .. 9] $ \y ->
-        Seq.fromList . flip fmap [0 .. 9] $ \x ->
-          tileData & (Seq.!? x) >>= (Seq.!? y) & Maybe.fromMaybe False
+transpose :: Tile -> Tile
+transpose tile@Tile{tileData} = tile{tileData = transposed}
+ where
+  transposed =
+    Seq.fromList . flip fmap [0 .. 9] $ \y ->
+      Seq.fromList . flip fmap [0 .. 9] $ \x ->
+        tileData & (Seq.!? x) >>= (Seq.!? y) & Maybe.fromMaybe False
 
-class Piece p where
-  matchH :: p -> p -> Bool
-  matchV :: p -> p -> Bool
-  flipX :: p -> p
-  flipY :: p -> p
-  transpose :: p -> p
-
-flips :: Piece p => p -> [p]
+flips :: Tile -> [Tile]
 flips tile = fmap ($ tile) [id, flipX, flipY, rotateCw, rotate180, rotateCcw, transpose, transposeFlipped]
 
-transposeFlipped :: Piece p => p -> p
+transposeFlipped :: Tile -> Tile
 transposeFlipped = rotate180 . transpose
 
-rotate180 :: Piece p => p -> p
+rotate180 :: Tile -> Tile
 rotate180 = flipX . flipY
 
-rotateCw :: Piece p => p -> p
+rotateCw :: Tile -> Tile
 rotateCw = flipX . transpose
 
-rotateCcw :: Piece p => p -> p
+rotateCcw :: Tile -> Tile
 rotateCcw = flipY . transpose
 
 data Tile = Tile {tileId :: Word, tileData :: Seq (Seq Bool)}
