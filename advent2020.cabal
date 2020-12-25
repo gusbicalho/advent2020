@@ -142,3 +142,10 @@ executable day19
   hs-source-dirs:      day19
   main-is:             Main.hs
   build-depends:       advent2020, megaparsec, transformers
+
+executable day20
+  import:              common-options
+  import:              optimized-executable
+  hs-source-dirs:      day20
+  main-is:             Main.hs
+  build-depends:       advent2020, megaparsec, transformers
