@@ -14,6 +14,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Main (main) where
 
@@ -29,6 +30,7 @@ import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Text.Read qualified as Read
+import qualified Data.Map.Strict as Map
 
 main :: IO ()
 main = do
@@ -41,54 +43,52 @@ main = do
 
 solve1 :: Seq Tile -> Word
 solve1 = maybe 0 (product . fmap tileId . fourCorners) . solveTiles . Foldable.toList
+ where
+  fourCorners = firstAndLast >=> firstAndLast
+  firstAndLast (f Seq.:<| (_ Seq.:|> l)) = [f, l]
+  firstAndLast _ = []
 
 solve2 :: Seq a -> Int
 solve2 = Seq.length
 
 solveTiles :: [Tile] -> Maybe (Seq (Seq Tile))
 solveTiles tiles = do
-  (corner, _) <- List.find isCorner matchList
-  let remaining = remove (sameTileIdAs corner . fst) matchList
-      (borderRow, remaining') = goRow (ignoringOrder matchH) [] corner remaining
-      (cols, remaining'') = goCols [] borderRow remaining'
-  guard (null remaining'')
+  let remainingMatchables = Map.fromList $ fmap (tileId &&& (id &&& matchesFor)) tiles
+  (remainingMatchables, corner) <- pickOneCorner remainingMatchables
+  (remainingMatchables, borderRow) <- pure $ goRow (ignoringOrder matchH) [] corner remainingMatchables
+  (remainingMatchables, cols) <- pure $ goCols [] borderRow remainingMatchables
+  guard (null remainingMatchables)
   pure $ Seq.fromList $ Seq.fromList <$> cols
  where
-  remove p = filter (not . p)
-  sameTileIdAs t = (== tileId t) . tileId
   goRow matcher rowTiles headTile possibleTiles =
-    case Maybe.mapMaybe (checkForMatch matcher headTile) possibleTiles of
-      [] -> (reverse $ headTile : rowTiles, possibleTiles)
-      (t : _) -> goRow matcher (headTile : rowTiles) t (remove (sameTileIdAs t . fst) possibleTiles)
+    case Maybe.mapMaybe (checkForMatch matcher headTile) $ Foldable.toList possibleTiles of
+      [] -> (possibleTiles, reverse $ headTile : rowTiles)
+      (t : _) -> goRow matcher (headTile : rowTiles) t (Map.delete (tileId t) possibleTiles)
+  goCols acc [] possibleTiles = (possibleTiles, acc)
+  goCols acc (colHead : moreColHeads) possibleTiles =
+    let (remaining, col) = goRow (ignoringOrder matchV) [] colHead possibleTiles
+     in goCols (col : acc) moreColHeads remaining
+  pickOneCorner m = case List.find (isCorner . snd) $ Map.toList m of
+    Nothing -> Nothing
+    Just (k, (t, _)) -> Just (Map.delete k m, t)
+  isCorner (_, [_, _]) = True
+  isCorner _ = False
   checkForMatch matcher t (t2, t2matches) =
     if any (sameTileIdAs t) t2matches
       then lookForMatch matcher t t2
       else Nothing
-  goCols acc [] possibleTiles = (acc, possibleTiles)
-  goCols acc (colHead : moreColHeads) possibleTiles =
-    let (col, remaining) = goRow (ignoringOrder matchV) [] colHead possibleTiles
-     in goCols (col : acc) moreColHeads remaining
-  isCorner (_, [_, _]) = True
-  isCorner _ = False
-  matchList :: [(Tile, [Tile])]
-  matchList = fmap (id &&& matchesFor) tiles
   matchesFor tile =
     Maybe.mapMaybe (lookForMatch (ignoringOrder matchAny) tile)
-      . remove (sameTileIdAs tile)
+      . filter (not . sameTileIdAs tile)
       $ tiles
   lookForMatch matcher tg1 tg2 =
     Maybe.listToMaybe $ do
       tg2' <- flips tg2
       guard (matcher tg1 tg2')
       pure tg2'
+  sameTileIdAs t = (== tileId t) . tileId
   ignoringOrder matcher t1 t2 = matcher t1 t2 || matcher t2 t1
   matchAny t1 t2 = matchV t1 t2 || matchH t1 t2
-
-fourCorners :: Seq (Seq a) -> [a]
-fourCorners = firstAndLast >=> firstAndLast
- where
-  firstAndLast (f Seq.:<| (_ Seq.:|> l)) = [f, l]
-  firstAndLast _ = []
 
 matchH :: Tile -> Tile -> Bool
 matchH Tile{tileData = td1} Tile{tileData = td2} =

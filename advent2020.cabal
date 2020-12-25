@@ -148,4 +148,4 @@ executable day20
   import:              optimized-executable
   hs-source-dirs:      day20
   main-is:             Main.hs
-  build-depends:       advent2020, megaparsec, transformers
+  build-depends:       advent2020
