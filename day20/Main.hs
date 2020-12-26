@@ -21,16 +21,19 @@ module Main (main) where
 import Advent2020.Input qualified
 import Control.Arrow (Arrow ((&&&)))
 import Control.Monad (guard, (>=>))
+import Data.Bifunctor (Bifunctor(bimap, first, second))
 import Data.Char qualified as Char
 import Data.Foldable qualified as Foldable
 import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.List qualified as List
+import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Text.Read qualified as Read
-import qualified Data.Map.Strict as Map
+import Data.Ord (comparing)
+import Data.Traversable (for)
 
 main :: IO ()
 main = do
@@ -38,8 +41,8 @@ main = do
   putStrLn . ("example: " <>) . show $ solve1 example
   putStrLn . ("for real: " <>) . show . solve1 =<< input
   putStrLn "Part 2"
-  putStrLn . ("example: " <>) . show $ solve2 example
-  putStrLn . ("for real: " <>) . show . solve2 =<< input
+  putStrLn . ("example: " <>) . show =<< solve2 example
+  putStrLn . ("for real: " <>) . show =<< solve2 =<< input
 
 solve1 :: Seq Tile -> Word
 solve1 = maybe 0 (product . fmap tileId . fourCorners) . solveTiles . Foldable.toList
@@ -48,16 +51,68 @@ solve1 = maybe 0 (product . fmap tileId . fourCorners) . solveTiles . Foldable.t
   firstAndLast (f Seq.:<| (_ Seq.:|> l)) = [f, l]
   firstAndLast _ = []
 
-solve2 :: Seq a -> Int
-solve2 = Seq.length
+solve2 :: Foldable t => t Tile -> IO Word
+solve2 tiles = do
+  let rendered = renderImage . Maybe.fromJust . solveTiles . Foldable.toList $ tiles
+      flipped = fmap tileData . flips . Tile 0 $ rendered
+      (dragonCount, selected) = List.maximumBy (comparing fst) $ (countSeaDragons &&& id) <$> flipped
+  putStrLn "Selected:"
+  printPixels selected
+  pure $ countChars '#' selected - 15 * dragonCount
+
+printPixels :: (Foldable t, Foldable u) => t (u Char) -> IO ()
+printPixels =
+  Foldable.traverse_ $ \row ->
+    putStrLn $ Foldable.toList row
+
+countChars :: Char -> Seq (Seq Char) -> Word
+countChars c = sumMap (sumMap (\c' -> if c' == c then 1 :: Word else 0))
+ where
+  sumMap f = sum . fmap f
+
+countSeaDragons :: Seq (Seq Char) -> Word
+countSeaDragons pixels =
+  List.genericLength $ filter isSeaDragon (coords pixels)
+ where
+  coords pxs =
+    let height = length pxs
+        width = maybe 0 length (pxs Seq.!? 0)
+     in [(x, y) | y <- [0 .. height -1], x <- [0 .. width -1]]
+  (!) :: Seq (Seq Char) -> (Int, Int) -> Char
+  (!) s (x, y) = Maybe.fromMaybe ' ' (s Seq.!? y >>= (Seq.!? x))
+  isSeaDragon :: (Int, Int) -> Bool
+  isSeaDragon (x, y) =
+    let coords = bimap (x +) (y +) <$> dragonCoords
+    in all (('#' ==) . (pixels !)) coords
+  dragonCoords :: [(Int, Int)]
+  dragonCoords = filter (('#' ==) . (dragon !)) (coords dragon)
+  dragon = Seq.fromList
+              [ Seq.fromList "                  # "
+              , Seq.fromList "#    ##    ##    ###"
+              , Seq.fromList " #  #  #  #  #  #   "
+              ]
+
+renderImage :: Seq (Seq Tile) -> Seq (Seq Char)
+renderImage = concatWith joinH . Seq.reverse . fmap (concatWith joinV . fmap renderTile)
+ where
+  renderTile = fmap dropEndpoints . dropEndpoints . tileData
+  dropEndpoints (_ Seq.:<| (middle Seq.:|> _)) = middle
+  dropEndpoints xs = xs
+  concatWith _ Seq.Empty = Seq.Empty
+  concatWith _ (pixels Seq.:<| Seq.Empty) = pixels
+  concatWith joinFn (pixels Seq.:<| morePixels) = joinFn pixels (concatWith joinFn morePixels)
+  joinH = Seq.zipWith (<>)
+  joinV top bottom = transposePixels $ joinH (transposePixels top) (transposePixels bottom)
 
 solveTiles :: [Tile] -> Maybe (Seq (Seq Tile))
 solveTiles tiles = do
   let remainingMatchables = Map.fromList $ fmap (tileId &&& (id &&& matchesFor)) tiles
   (remainingMatchables, corner) <- pickOneCorner remainingMatchables
-  (remainingMatchables, borderRow) <- pure $ goRow (ignoringOrder matchH) [] corner remainingMatchables
-  (remainingMatchables, cols) <- pure $ goCols [] borderRow remainingMatchables
-  guard (null remainingMatchables)
+  cols <- Foldable.asum . flip fmap (flips corner) $ \corner -> do
+    (remainingMatchables, borderRow) <- pure $ goRow matchH [] corner remainingMatchables
+    (remainingMatchables, cols) <- pure $ goCols [] borderRow remainingMatchables
+    guard (null remainingMatchables)
+    Just cols
   pure $ Seq.fromList $ Seq.fromList <$> cols
  where
   goRow matcher rowTiles headTile possibleTiles =
@@ -66,7 +121,7 @@ solveTiles tiles = do
       (t : _) -> goRow matcher (headTile : rowTiles) t (Map.delete (tileId t) possibleTiles)
   goCols acc [] possibleTiles = (possibleTiles, acc)
   goCols acc (colHead : moreColHeads) possibleTiles =
-    let (remaining, col) = goRow (ignoringOrder matchV) [] colHead possibleTiles
+    let (remaining, col) = goRow matchV [] colHead possibleTiles
      in goCols (col : acc) moreColHeads remaining
   pickOneCorner m = case List.find (isCorner . snd) $ Map.toList m of
     Nothing -> Nothing
@@ -117,10 +172,11 @@ flipY tile@Tile{tileData} = tile{tileData = Seq.reverse tileData}
 transpose :: Tile -> Tile
 transpose tile@Tile{tileData} = tile{tileData = transposed}
  where
-  transposed =
-    Seq.fromList . flip fmap [0 .. 9] $ \y ->
-      Seq.fromList . flip fmap [0 .. 9] $ \x ->
-        tileData & (Seq.!? x) >>= (Seq.!? y) & Maybe.fromMaybe False
+  transposed = transposePixels tileData
+
+transposePixels :: Seq (Seq Char) -> Seq (Seq Char)
+transposePixels =
+  Seq.fromList . fmap Seq.fromList . List.transpose . Foldable.toList . fmap Foldable.toList
 
 flips :: Tile -> [Tile]
 flips tile = fmap ($ tile) [id, flipX, flipY, rotateCw, rotate180, rotateCcw, transpose, transposeFlipped]
@@ -137,7 +193,7 @@ rotateCw = flipX . transpose
 rotateCcw :: Tile -> Tile
 rotateCcw = flipY . transpose
 
-data Tile = Tile {tileId :: Word, tileData :: Seq (Seq Bool)}
+data Tile = Tile {tileId :: Word, tileData :: Seq (Seq Char)}
   deriving stock (Eq, Ord, Show)
 
 parseTiles :: Foldable t => t String -> [Tile]
@@ -151,14 +207,12 @@ parseTiles = readTiles . Foldable.toList
     readTileId s <&> \tileId ->
       Tile
         { tileId
-        , tileData = Seq.fromList (Seq.fromList . fmap pixelToBit <$> ss)
+        , tileData = Seq.fromList (Seq.fromList <$> ss)
         }
   readTileId s =
     s & List.stripPrefix "Tile "
       <&> takeWhile Char.isDigit
       >>= Read.readMaybe @Word
-  pixelToBit '#' = True
-  pixelToBit _ = False
 
 splitWhen :: (a -> Bool) -> [a] -> [[a]]
 splitWhen p xs = case break p (dropWhile p xs) of
