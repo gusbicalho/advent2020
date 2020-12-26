@@ -21,7 +21,7 @@ module Main (main) where
 import Advent2020.Input qualified
 import Control.Arrow (Arrow ((&&&)))
 import Control.Monad (guard, (>=>))
-import Data.Bifunctor (Bifunctor(bimap, first, second))
+import Data.Bifunctor (Bifunctor(bimap))
 import Data.Char qualified as Char
 import Data.Foldable qualified as Foldable
 import Data.Function ((&))
@@ -33,7 +33,6 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Text.Read qualified as Read
 import Data.Ord (comparing)
-import Data.Traversable (for)
 
 main :: IO ()
 main = do
