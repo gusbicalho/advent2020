@@ -163,3 +163,9 @@ executable day22
   hs-source-dirs:      day22
   main-is:             Main.hs
   build-depends:       advent2020, transformers
+
+executable day23
+  import:              common-options
+  import:              optimized-executable
+  hs-source-dirs:      day23
+  main-is:             Main.hs
