@@ -24,6 +24,7 @@ import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq ((:<|), (:|>)))
 import Data.Sequence qualified as Seq
 import Data.Word (Word64)
+import qualified Data.Tuple as Tuple
 
 main :: IO ()
 main = do
@@ -39,9 +40,9 @@ solve1 = toAnswer . snd . (!! 100) . List.iterate' move . (0,) . circleTake 9
  where
   toAnswer circle
     | circle !!* 0 == 1 = drop 1 $ Foldable.foldMap' show circle
-    | otherwise = toAnswer (shift1 circle)
+    | otherwise = toAnswer (shiftTo 1 circle)
 
-solve2 = toAnswer . snd . (!! 10_000_000) . List.iterate' move . (0,) . circleTake 9
+solve2 = toAnswer . snd . (!! 10_000_000) . List.iterate' move . (0,)
  where
   toAnswer circle =
     let ix = Maybe.fromMaybe 0 $ circleIndexOf circle 1
@@ -66,23 +67,23 @@ move (currentIx, circle) =
   !destinationLabel = avoidExtracted (labelMinus1 currentLabel)
   -- destinationIx = Maybe.fromMaybe currentIx $ circleIndexOf circle' destinationLabel
   circle'' =
-    fixCurrent $ foldr (insertAfterElement destinationLabel) circle' extracted
+    fixCurrent $ insertAllAfterElement destinationLabel extracted circle'
   fixCurrent c
-    | c !!* currentIx == circle !!* currentIx = c
+    | c !!* currentIx == currentLabel = c
     | otherwise = fixCurrent (shift1 c)
   labelMinus1 l = 1 + ((fromIntegral l - 2) `modulus` totalSize)
   avoidExtracted l
-    | l `elem` circle' = l
+    | l `notElem` extracted = l
     | otherwise = avoidExtracted (labelMinus1 l)
 
-extract :: Int -> Int -> Circle a -> (Circle a, [a])
+extract :: Int -> Int -> Circle a -> (Circle a, Seq a)
 extract from count circle@(Circle s)
-  | count <= 0 = (circle, [])
+  | count <= 0 = (circle, Seq.empty)
   | otherwise =
     let (front, (middle, back)) = second (Seq.splitAt count) . Seq.splitAt from $ s
         missingPieceSize = count - Seq.length middle
         (frontTaken, frontStay) = Seq.splitAt missingPieceSize front
-     in (Circle $ frontStay <> back, Foldable.toList $ middle <> frontTaken)
+     in (Circle $ frontStay <> back, middle <> frontTaken)
 
 -- (!!*!) :: Circle a -> Int -> (Circle a, a)
 -- c@(Circle s) !!*!
@@ -95,11 +96,13 @@ c@(Circle s) !* i = (Circle $ Seq.deleteAt iMod s, Seq.index s iMod)
 (!!*) :: Circle a -> Int -> a
 c !!* i = snd $ c !* i
 
-insertAfterElement :: Eq a => a -> a -> Circle a -> Circle a
-insertAfterElement reference a c@(Circle s) =
+insertAllAfterElement :: (Eq a) => a -> Seq a -> Circle a -> Circle a
+insertAllAfterElement reference as c@(Circle s) =
   case Seq.elemIndexL reference s of
     Nothing -> c
-    Just ix -> Circle $ Seq.insertAt (succ ix) a s
+    Just ix ->
+      let !(front, back) = Seq.splitAt (succ ix) s
+      in Circle $ front <> as <> back
 
 circleIndexOf :: Eq a => Circle a -> a -> Maybe Int
 circleIndexOf (Circle s) e = Seq.elemIndexL e s
@@ -112,6 +115,11 @@ circleTake n (Circle s) = Circle (Seq.take n s)
 shift1 :: Circle a -> Circle a
 shift1 (Circle Seq.Empty) = Circle Seq.Empty
 shift1 (Circle (e :<| more)) = Circle (more :|> e)
+
+shiftTo :: Eq a => a -> Circle a -> Circle a
+shiftTo e c@(Circle s) = case Seq.elemIndexL e s of
+  Nothing -> c
+  Just ix -> Circle . uncurry (<>) . Tuple.swap . Seq.splitAt ix $ s
 
 modulus :: Int -> Word64 -> Word64
 modulus i m = case compare 0 i of
