@@ -170,3 +170,10 @@ executable day23
   hs-source-dirs:      day23
   main-is:             Main.hs
   other-modules:       CircleST
+
+executable day24
+  import:              common-options
+  import:              optimized-executable
+  hs-source-dirs:      day24
+  main-is:             Main.hs
+  build-depends:       advent2020
