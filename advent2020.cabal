@@ -169,3 +169,4 @@ executable day23
   import:              optimized-executable
   hs-source-dirs:      day23
   main-is:             Main.hs
+  other-modules:       CircleST
